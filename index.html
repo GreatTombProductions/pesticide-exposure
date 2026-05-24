@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesticide Use Near You — California</title>
+    <meta name="description" content="Enter a California address and see what pesticides were applied nearby. 138M+ lbs across 22,000+ sections from DPR Pesticide Use Reports (2023).">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+        header { text-align: center; padding: 40px 20px 30px; }
+        h1 { font-size: 2rem; color: #66bb6a; margin-bottom: 8px; }
+        .subtitle { color: #888; font-size: 0.95rem; max-width: 600px; margin: 0 auto; }
+
+        .search-section { margin: 20px 0 30px; }
+        .search-row { display: flex; gap: 10px; margin-bottom: 8px; }
+        .search-input {
+            flex: 1;
+            padding: 14px 18px;
+            font-size: 1.1rem;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus { border-color: #66bb6a; }
+        .search-btn {
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #66bb6a;
+            color: #0f0f0f;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .search-btn:hover { background: #81c784; }
+        .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .search-hint { color: #666; font-size: 0.8rem; margin-top: 6px; }
+        .search-error { color: #ff5252; font-size: 0.85rem; margin-top: 6px; display: none; }
+
+        .radius-selector {
+            display: flex; gap: 8px; align-items: center; margin-top: 10px;
+        }
+        .radius-selector label { color: #888; font-size: 0.85rem; }
+        .radius-btn {
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            background: #1a1a1a;
+            color: #888;
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .radius-btn.active { background: #66bb6a; color: #0f0f0f; border-color: #66bb6a; font-weight: 600; }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 20px 0 30px;
+            padding: 16px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            border: 1px solid #252525;
+        }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.3rem; font-weight: 700; color: #66bb6a; }
+        .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .loading { text-align: center; padding: 40px; color: #666; display: none; }
+        .loading.active { display: block; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #333; border-top-color: #66bb6a; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .results { margin: 20px 0; }
+        .results-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+        .result-count { color: #888; font-size: 0.85rem; }
+        .results-summary { font-size: 0.85rem; color: #ff9800; font-weight: 600; }
+
+        .section-card {
+            background: #1a1a1a;
+            border: 1px solid #252525;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .section-card:hover { border-color: #66bb6a; }
+        .section-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+        .section-location { font-size: 1rem; font-weight: 600; color: #e0e0e0; }
+        .section-distance { font-size: 0.85rem; color: #888; white-space: nowrap; }
+        .section-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.85rem; color: #888; }
+        .section-meta span { white-space: nowrap; }
+        .danger-val { color: #ff5252; font-weight: 600; }
+        .warning-val { color: #ff9800; font-weight: 600; }
+        .restricted-badge {
+            background: #ff5252;
+            color: #fff;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .toxicity-bar {
+            display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 8px; gap: 1px;
+        }
+        .tox-poison { background: #d32f2f; }
+        .tox-danger { background: #ff5252; }
+        .tox-warning { background: #ff9800; }
+        .tox-caution { background: #ffc107; }
+        .tox-none { background: #66bb6a; }
+
+        /* Detail panel */
+        .detail-panel {
+            display: none;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+        .detail-panel.active { display: block; }
+        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .detail-title { font-size: 1.2rem; font-weight: 700; color: #66bb6a; }
+        .close-btn {
+            background: none;
+            border: 1px solid #444;
+            color: #888;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .close-btn:hover { border-color: #888; color: #e0e0e0; }
+
+        .detail-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .detail-stat {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .detail-stat-value { font-size: 1.2rem; font-weight: 700; }
+        .detail-stat-label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+
+        h3 { font-size: 0.95rem; color: #66bb6a; margin: 20px 0 10px; font-weight: 600; }
+
+        .chemical-list { list-style: none; }
+        .chemical-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 0.85rem;
+        }
+        .chemical-item:last-child { border-bottom: none; }
+        .chemical-name { flex: 1; color: #ccc; }
+        .chemical-lbs { color: #ff9800; font-weight: 600; margin-left: 12px; white-space: nowrap; }
+        .chemical-apps { color: #666; font-size: 0.75rem; margin-left: 8px; white-space: nowrap; }
+
+        .toxicity-breakdown { margin-bottom: 20px; }
+        .tox-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 0; font-size: 0.85rem;
+        }
+        .tox-label { width: 120px; color: #888; font-size: 0.8rem; }
+        .tox-bar-container { flex: 1; height: 16px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
+        .tox-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .tox-value { width: 80px; text-align: right; font-weight: 600; font-size: 0.8rem; }
+
+        .monthly-chart { margin: 10px 0 20px; }
+        .month-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 3px 0; font-size: 0.8rem;
+        }
+        .month-label { width: 30px; color: #666; text-align: right; }
+        .month-bar-container { flex: 1; height: 14px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+        .month-bar { height: 100%; background: #66bb6a; border-radius: 2px; }
+        .month-value { width: 70px; color: #888; font-size: 0.75rem; text-align: right; }
+
+        footer {
+            margin-top: 60px;
+            padding: 30px 20px;
+            border-top: 1px solid #252525;
+            color: #666;
+            font-size: 0.8rem;
+            line-height: 1.7;
+        }
+        footer a { color: #66bb6a; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        .about-section {
+            background: #1a1a1a;
+            border: 1px solid #252525;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            font-size: 0.85rem;
+            color: #999;
+            line-height: 1.7;
+        }
+        .about-section summary {
+            cursor: pointer; color: #888; font-weight: 600;
+        }
+        .about-section summary:hover { color: #e0e0e0; }
+        .about-section p { margin: 10px 0; }
+        .about-section strong { color: #ccc; }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.5rem; }
+            .search-row { flex-direction: column; }
+            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .detail-stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pesticide Use Near You</h1>
+            <p class="subtitle">Enter a California address to see what pesticides were applied within 1-3 miles. Data from the California Department of Pesticide Regulation.</p>
+        </header>
+
+        <div class="search-section">
+            <div class="search-row">
+                <input type="text" class="search-input" id="addressInput"
+                       placeholder="Enter a California address or city..."
+                       autocomplete="off">
+                <button class="search-btn" id="searchBtn" onclick="doSearch()">Search</button>
+            </div>
+            <div class="search-hint">Try: "Fresno, CA" or "123 Main St, Bakersfield, CA" or "Salinas, CA 93901"</div>
+            <div class="search-error" id="searchError"></div>
+            <div class="radius-selector">
+                <label>Radius:</label>
+                <button class="radius-btn" data-miles="0.5" onclick="setRadius(0.5)">1/2 mi</button>
+                <button class="radius-btn active" data-miles="1" onclick="setRadius(1)">1 mi</button>
+                <button class="radius-btn" data-miles="3" onclick="setRadius(3)">3 mi</button>
+                <button class="radius-btn" data-miles="5" onclick="setRadius(5)">5 mi</button>
+            </div>
+        </div>
+
+        <div class="stats-bar" id="globalStats">
+            <div class="stat-item">
+                <div class="stat-value" id="statSections">--</div>
+                <div class="stat-label">Sections</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statLbs">--</div>
+                <div class="stat-label">Lbs Applied</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statRestricted">--</div>
+                <div class="stat-label">Restricted Lbs</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statChemicals">--</div>
+                <div class="stat-label">Chemicals</div>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingIndicator">
+            <span class="spinner"></span> Loading pesticide data...
+        </div>
+
+        <div class="results" id="resultsContainer" style="display:none;"></div>
+
+        <div class="detail-panel" id="detailPanel">
+            <div class="detail-header">
+                <div class="detail-title" id="detailTitle"></div>
+                <button class="close-btn" onclick="closeDetail()">Close</button>
+            </div>
+            <div id="detailContent"></div>
+        </div>
+
+        <details class="about-section">
+            <summary>About this tool</summary>
+            <p>California is the only U.S. state that requires reporting of <strong>every commercial agricultural pesticide application</strong>. The data goes back to 1990. This tool uses 2023 data covering 138 million lbs of pesticides across 22,900+ square-mile sections.</p>
+            <p><strong>How it works:</strong> Your address is geocoded to coordinates, then we find all PLSS (Public Land Survey System) sections within your chosen radius. Each section is approximately 1 square mile. We show what pesticides were reported in those sections during 2023.</p>
+            <p><strong>What the toxicity classes mean:</strong></p>
+            <p>&bull; <strong style="color:#d32f2f">POISON/DANGER</strong> &mdash; Signal word for the most acutely toxic products. Restricted-use pesticides often carry this label.<br>
+            &bull; <strong style="color:#ff5252">DANGER</strong> &mdash; Causes irreversible eye damage or skin corrosion.<br>
+            &bull; <strong style="color:#ff9800">WARNING</strong> &mdash; Moderately toxic through one or more exposure routes.<br>
+            &bull; <strong style="color:#ffc107">CAUTION</strong> &mdash; Slightly toxic or relatively non-toxic.<br>
+            &bull; <strong style="color:#66bb6a">NONE</strong> &mdash; No signal word required (minimum risk).</p>
+            <p><strong>Limitations:</strong> Geographic precision is ~1 square mile (PLSS section). Urban structural pest control applications often lack PLSS coordinates and are excluded. This tool shows reported applications, not measured environmental exposure.</p>
+            <p><strong>Data source:</strong> <a href="https://www.cdpr.ca.gov/pesticide-use-in-california/pesticide-use-reporting/">California DPR Pesticide Use Reports</a> (2023). PLSS geographic data from <a href="https://calpip.cdpr.ca.gov/plssFiles.cfm">CalPIP</a>.</p>
+        </details>
+
+        <footer>
+            <strong>Data:</strong> California Department of Pesticide Regulation &mdash; Pesticide Use Reports (2023). 4.3M application records, 138M lbs, 582 chemicals.
+            Geographic data: DPR PLSS section centroids (22,923 sections with applications).<br>
+            <strong>Source:</strong> <a href="https://github.com/GreatTombProductions/pesticide-exposure">GitHub</a><br>
+            <strong>Note:</strong> This tool shows reported pesticide applications, not environmental exposure levels. Consult local health agencies for exposure assessments.
+        </footer>
+    </div>
+
+    <script>
+    let sectionsData = null;
+    let currentRadius = 1; // miles
+    let userLat = null, userLon = null;
+
+    const MONTH_NAMES = {JAN:'Jan',FEB:'Feb',MAR:'Mar',APR:'Apr',MAY:'May',JUN:'Jun',
+                         JUL:'Jul',AUG:'Aug',SEP:'Sep',OCT:'Oct',NOV:'Nov',DEC:'Dec'};
+
+    // Load sections index on page load
+    async function init() {
+        document.getElementById('loadingIndicator').classList.add('active');
+        try {
+            const resp = await fetch('data/processed/sections.json');
+            sectionsData = await resp.json();
+
+            const metaResp = await fetch('data/processed/meta.json');
+            const meta = await metaResp.json();
+
+            document.getElementById('statSections').textContent = meta.total_sections.toLocaleString();
+            document.getElementById('statLbs').textContent = formatLbs(meta.total_lbs);
+            document.getElementById('statRestricted').textContent = formatLbs(meta.total_restricted_lbs);
+            document.getElementById('statChemicals').textContent = meta.unique_chemicals.toLocaleString();
+        } catch(e) {
+            console.error('Failed to load data:', e);
+        }
+        document.getElementById('loadingIndicator').classList.remove('active');
+
+        // Enter key triggers search
+        document.getElementById('addressInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doSearch();
+        });
+    }
+
+    function formatLbs(lbs) {
+        if (lbs >= 1e9) return (lbs / 1e9).toFixed(1) + 'B';
+        if (lbs >= 1e6) return (lbs / 1e6).toFixed(1) + 'M';
+        if (lbs >= 1e3) return (lbs / 1e3).toFixed(1) + 'K';
+        return lbs.toFixed(0);
+    }
+
+    function formatLbsFull(lbs) {
+        return Math.round(lbs).toLocaleString();
+    }
+
+    function setRadius(miles) {
+        currentRadius = miles;
+        document.querySelectorAll('.radius-btn').forEach(b => {
+            b.classList.toggle('active', parseFloat(b.dataset.miles) === miles);
+        });
+        if (userLat && userLon) showResults();
+    }
+
+    async function doSearch() {
+        const addr = document.getElementById('addressInput').value.trim();
+        if (!addr) return;
+
+        const errEl = document.getElementById('searchError');
+        errEl.style.display = 'none';
+        document.getElementById('searchBtn').disabled = true;
+        document.getElementById('searchBtn').textContent = 'Searching...';
+
+        try {
+            // Geocode via Nominatim (OSM)
+            const q = encodeURIComponent(addr + (addr.toLowerCase().includes('california') || addr.toLowerCase().includes(', ca') ? '' : ', California'));
+            const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=us`);
+            const results = await resp.json();
+
+            if (!results.length) {
+                errEl.textContent = 'Address not found. Try a more specific California address.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const {lat, lon, display_name} = results[0];
+
+            // Verify it's in California (rough bbox)
+            const latF = parseFloat(lat), lonF = parseFloat(lon);
+            if (latF < 32.5 || latF > 42.1 || lonF < -124.5 || lonF > -114.1) {
+                errEl.textContent = 'This address doesn\'t appear to be in California. This tool only covers California.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            userLat = latF;
+            userLon = lonF;
+            showResults();
+        } catch(e) {
+            errEl.textContent = 'Geocoding failed. Please try again.';
+            errEl.style.display = 'block';
+        } finally {
+            document.getElementById('searchBtn').disabled = false;
+            document.getElementById('searchBtn').textContent = 'Search';
+        }
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 3959; // Earth radius in miles
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function showResults() {
+        if (!sectionsData || userLat === null) return;
+
+        closeDetail();
+
+        // Find sections within radius
+        // Pre-filter by bounding box for performance
+        const degPerMile = 1/69.0;
+        const latRange = currentRadius * degPerMile * 1.2;
+        const lonRange = currentRadius * degPerMile / Math.cos(userLat * Math.PI / 180) * 1.2;
+
+        const nearby = [];
+        for (const sec of sectionsData) {
+            if (Math.abs(sec.la - userLat) > latRange) continue;
+            if (Math.abs(sec.lo - userLon) > lonRange) continue;
+            const dist = haversineDistance(userLat, userLon, sec.la, sec.lo);
+            if (dist <= currentRadius) {
+                nearby.push({...sec, dist});
+            }
+        }
+
+        nearby.sort((a, b) => a.dist - b.dist);
+
+        const container = document.getElementById('resultsContainer');
+        container.style.display = 'block';
+
+        if (nearby.length === 0) {
+            container.innerHTML = `
+                <div class="results-header">
+                    <span class="result-count">No pesticide application data within ${currentRadius} mile${currentRadius !== 1 ? 's' : ''}</span>
+                </div>
+                <p style="color:#888; font-size:0.9rem; padding:20px 0;">This area may not have agricultural activity, or applications may not be geocoded to PLSS sections. Try increasing the radius or searching a different area.</p>
+            `;
+            return;
+        }
+
+        const totalLbs = nearby.reduce((s, n) => s + n.lb, 0);
+        const totalApps = nearby.reduce((s, n) => s + n.ap, 0);
+        const totalRestricted = nearby.reduce((s, n) => s + n.rl, 0);
+
+        let html = `
+            <div class="results-header">
+                <span class="result-count">${nearby.length} section${nearby.length !== 1 ? 's' : ''} within ${currentRadius} mi</span>
+                <span class="results-summary">${formatLbsFull(totalLbs)} lbs total &bull; ${totalApps.toLocaleString()} applications</span>
+            </div>
+        `;
+
+        if (totalRestricted > 0) {
+            html += `<div style="color:#ff5252; font-size:0.85rem; margin-bottom:12px; font-weight:600;">
+                ${formatLbsFull(totalRestricted)} lbs of restricted-use pesticides
+            </div>`;
+        }
+
+        for (const sec of nearby) {
+            const hasDanger = sec.rl > 0;
+            html += `
+                <div class="section-card" onclick="showSectionDetail('${sec.c}', ${sec.dist.toFixed(2)})">
+                    <div class="section-header">
+                        <span class="section-location">${sec.co} County &mdash; Section ${sec.c}</span>
+                        <span class="section-distance">${sec.dist.toFixed(1)} mi</span>
+                    </div>
+                    <div class="section-meta">
+                        <span>${formatLbsFull(sec.lb)} lbs applied</span>
+                        <span>${sec.ap.toLocaleString()} applications</span>
+                        ${hasDanger ? `<span class="restricted-badge">Restricted: ${formatLbs(sec.rl)} lbs</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function md5hex2(str) {
+        // Simple hash for shard key (matches Python's hashlib.md5().hexdigest()[:2])
+        // We'll use a JS implementation
+        let h = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 0x01000193);
+        }
+        h = h >>> 0;
+        const hex = h.toString(16).padStart(8, '0');
+        // This won't match MD5 — we need to try loading the shard
+        return null; // We'll compute it differently
+    }
+
+    async function showSectionDetail(comtrs, dist) {
+        // We need the MD5-based shard key. Since we can't easily compute MD5 in client JS,
+        // let's try all 256 shards... or better, precompute the mapping.
+        // Actually, let's use SubtleCrypto for MD5 — no, MD5 isn't available in SubtleCrypto.
+        // Let's use a lightweight MD5 implementation.
+
+        const shard = md5first2(comtrs);
+        try {
+            const resp = await fetch(`data/processed/s/${shard}.json`);
+            if (!resp.ok) throw new Error('Shard not found');
+            const data = await resp.json();
+            const detail = data[comtrs];
+            if (!detail) throw new Error('Section not found in shard');
+
+            renderDetail(comtrs, detail, dist);
+        } catch(e) {
+            console.error('Failed to load section detail:', e);
+        }
+    }
+
+    // Minimal MD5 for shard key computation
+    function md5first2(str) {
+        // We need proper MD5 — use a minimal implementation
+        function md5(string) {
+            function cmn(q, a, b, x, s, t) {
+                a = add32(add32(a, q), add32(x, t));
+                return add32((a << s) | (a >>> (32 - s)), b);
+            }
+            function ff(a,b,c,d,x,s,t) { return cmn((b&c)|((~b)&d),a,b,x,s,t); }
+            function gg(a,b,c,d,x,s,t) { return cmn((b&d)|(c&(~d)),a,b,x,s,t); }
+            function hh(a,b,c,d,x,s,t) { return cmn(b^c^d,a,b,x,s,t); }
+            function ii(a,b,c,d,x,s,t) { return cmn(c^(b|(~d)),a,b,x,s,t); }
+
+            function md5cycle(x, k) {
+                let a=x[0], b=x[1], c=x[2], d=x[3];
+                a=ff(a,b,c,d,k[0],7,-680876936);d=ff(d,a,b,c,k[1],12,-389564586);c=ff(c,d,a,b,k[2],17,606105819);b=ff(b,c,d,a,k[3],22,-1044525330);
+                a=ff(a,b,c,d,k[4],7,-176418897);d=ff(d,a,b,c,k[5],12,1200080426);c=ff(c,d,a,b,k[6],17,-1473231341);b=ff(b,c,d,a,k[7],22,-45705983);
+                a=ff(a,b,c,d,k[8],7,1770035416);d=ff(d,a,b,c,k[9],12,-1958414417);c=ff(c,d,a,b,k[10],17,-42063);b=ff(b,c,d,a,k[11],22,-1990404162);
+                a=ff(a,b,c,d,k[12],7,1804603682);d=ff(d,a,b,c,k[13],12,-40341101);c=ff(c,d,a,b,k[14],17,-1502002290);b=ff(b,c,d,a,k[15],22,1236535329);
+                a=gg(a,b,c,d,k[1],5,-165796510);d=gg(d,a,b,c,k[6],9,-1069501632);c=gg(c,d,a,b,k[11],14,643717713);b=gg(b,c,d,a,k[0],20,-373897302);
+                a=gg(a,b,c,d,k[5],5,-701558691);d=gg(d,a,b,c,k[10],9,38016083);c=gg(c,d,a,b,k[15],14,-660478335);b=gg(b,c,d,a,k[4],20,-405537848);
+                a=gg(a,b,c,d,k[9],5,568446438);d=gg(d,a,b,c,k[14],9,-1019803690);c=gg(c,d,a,b,k[3],14,-187363961);b=gg(b,c,d,a,k[8],20,1163531501);
+                a=gg(a,b,c,d,k[13],5,-1444681467);d=gg(d,a,b,c,k[2],9,-51403784);c=gg(c,d,a,b,k[7],14,1735328473);b=gg(b,c,d,a,k[12],20,-1926607734);
+                a=hh(a,b,c,d,k[5],4,-378558);d=hh(d,a,b,c,k[8],11,-2022574463);c=hh(c,d,a,b,k[11],16,1839030562);b=hh(b,c,d,a,k[14],23,-35309556);
+                a=hh(a,b,c,d,k[1],4,-1530992060);d=hh(d,a,b,c,k[4],11,1272893353);c=hh(c,d,a,b,k[7],16,-155497632);b=hh(b,c,d,a,k[10],23,-1094730640);
+                a=hh(a,b,c,d,k[13],4,681279174);d=hh(d,a,b,c,k[0],11,-358537222);c=hh(c,d,a,b,k[3],16,-722521979);b=hh(b,c,d,a,k[6],23,76029189);
+                a=hh(a,b,c,d,k[9],4,-640364487);d=hh(d,a,b,c,k[12],11,-421815835);c=hh(c,d,a,b,k[15],16,530742520);b=hh(b,c,d,a,k[2],23,-995338651);
+                a=ii(a,b,c,d,k[0],6,-198630844);d=ii(d,a,b,c,k[7],10,1126891415);c=ii(c,d,a,b,k[14],15,-1416354905);b=ii(b,c,d,a,k[5],21,-57434055);
+                a=ii(a,b,c,d,k[12],6,1700485571);d=ii(d,a,b,c,k[3],10,-1894986606);c=ii(c,d,a,b,k[10],15,-1051523);b=ii(b,c,d,a,k[1],21,-2054922799);
+                a=ii(a,b,c,d,k[8],6,1873313359);d=ii(d,a,b,c,k[15],10,-30611744);c=ii(c,d,a,b,k[6],15,-1560198380);b=ii(b,c,d,a,k[13],21,1309151649);
+                a=ii(a,b,c,d,k[4],6,-145523070);d=ii(d,a,b,c,k[11],10,-1120210379);c=ii(c,d,a,b,k[2],15,718787259);b=ii(b,c,d,a,k[9],21,-343485551);
+                x[0]=add32(a,x[0]);x[1]=add32(b,x[1]);x[2]=add32(c,x[2]);x[3]=add32(d,x[3]);
+            }
+
+            function md5blk(s) {
+                const md5blks = [];
+                for (let i = 0; i < 64; i += 4) {
+                    md5blks[i>>2] = s.charCodeAt(i) + (s.charCodeAt(i+1)<<8) + (s.charCodeAt(i+2)<<16) + (s.charCodeAt(i+3)<<24);
+                }
+                return md5blks;
+            }
+
+            function add32(a, b) { return (a + b) & 0xFFFFFFFF; }
+
+            function rhex(n) {
+                const hex = '0123456789abcdef';
+                let s = '';
+                for (let j = 0; j < 4; j++)
+                    s += hex.charAt((n >> (j * 8 + 4)) & 0x0f) + hex.charAt((n >> (j * 8)) & 0x0f);
+                return s;
+            }
+
+            let n = string.length;
+            let state = [1732584193, -271733879, -1732584194, 271733878];
+            let i;
+            for (i = 64; i <= n; i += 64) {
+                md5cycle(state, md5blk(string.substring(i - 64, i)));
+            }
+            string = string.substring(i - 64);
+            const tail = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+            for (i = 0; i < string.length; i++)
+                tail[i>>2] |= string.charCodeAt(i) << ((i%4) << 3);
+            tail[i>>2] |= 0x80 << ((i%4) << 3);
+            if (i > 55) {
+                md5cycle(state, tail);
+                for (i = 0; i < 16; i++) tail[i] = 0;
+            }
+            tail[14] = n * 8;
+            md5cycle(state, tail);
+            return rhex(state[0]) + rhex(state[1]) + rhex(state[2]) + rhex(state[3]);
+        }
+
+        return md5(str).substring(0, 2);
+    }
+
+    function renderDetail(comtrs, detail, dist) {
+        const panel = document.getElementById('detailPanel');
+        const title = document.getElementById('detailTitle');
+        const content = document.getElementById('detailContent');
+
+        title.textContent = `Section ${comtrs} (${dist.toFixed(1)} mi away)`;
+
+        // Stats row
+        let html = '<div class="detail-stats">';
+        html += `<div class="detail-stat"><div class="detail-stat-value" style="color:#ff9800">${formatLbsFull(detail.lbs)}</div><div class="detail-stat-label">Total Lbs</div></div>`;
+        html += `<div class="detail-stat"><div class="detail-stat-value" style="color:#66bb6a">${detail.apps.toLocaleString()}</div><div class="detail-stat-label">Applications</div></div>`;
+        html += `<div class="detail-stat"><div class="detail-stat-value" style="color:#ff5252">${formatLbsFull(detail.restricted_lbs)}</div><div class="detail-stat-label">Restricted Lbs</div></div>`;
+        html += `<div class="detail-stat"><div class="detail-stat-value" style="color:#2196f3">${formatLbsFull(detail.ag_lbs)}</div><div class="detail-stat-label">Agricultural Lbs</div></div>`;
+        html += '</div>';
+
+        // Toxicity breakdown
+        const toxOrder = ['POISON/DANGER', 'DANGER (ONLY)', 'WARNING', 'CAUTION', 'NONE'];
+        const toxColors = {'POISON/DANGER':'#d32f2f', 'DANGER (ONLY)':'#ff5252', 'WARNING':'#ff9800', 'CAUTION':'#ffc107', 'NONE':'#66bb6a', 'Unknown':'#666'};
+        const toxLabels = {'POISON/DANGER':'Poison/Danger', 'DANGER (ONLY)':'Danger', 'WARNING':'Warning', 'CAUTION':'Caution', 'NONE':'None'};
+        const maxToxLbs = Math.max(...Object.values(detail.toxicity || {}).map(v => v.lbs), 1);
+
+        html += '<h3>Toxicity Classification</h3><div class="toxicity-breakdown">';
+        for (const tox of toxOrder) {
+            const v = (detail.toxicity || {})[tox];
+            if (!v || v.lbs === 0) continue;
+            const pct = (v.lbs / maxToxLbs * 100).toFixed(1);
+            html += `<div class="tox-row">
+                <span class="tox-label">${toxLabels[tox] || tox}</span>
+                <div class="tox-bar-container">
+                    <div class="tox-bar-fill" style="width:${pct}%;background:${toxColors[tox] || '#666'}"></div>
+                </div>
+                <span class="tox-value" style="color:${toxColors[tox] || '#666'}">${formatLbsFull(v.lbs)} lbs</span>
+            </div>`;
+        }
+        html += '</div>';
+
+        // Top chemicals
+        if (detail.chemicals && detail.chemicals.length > 0) {
+            html += '<h3>Top Chemicals Applied</h3><ul class="chemical-list">';
+            for (const chem of detail.chemicals) {
+                html += `<li class="chemical-item">
+                    <span class="chemical-name">${chem.name}</span>
+                    <span class="chemical-lbs">${formatLbsFull(chem.lbs)} lbs</span>
+                    <span class="chemical-apps">${chem.apps} apps</span>
+                </li>`;
+            }
+            html += '</ul>';
+        }
+
+        // Monthly breakdown
+        if (detail.months && Object.keys(detail.months).length > 0) {
+            const maxMonthLbs = Math.max(...Object.values(detail.months).map(v => v.lbs), 1);
+            const monthOrder = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+            html += '<h3>Monthly Application Pattern</h3><div class="monthly-chart">';
+            for (const m of monthOrder) {
+                const v = detail.months[m];
+                if (!v) {
+                    html += `<div class="month-row"><span class="month-label">${(MONTH_NAMES[m]||m)}</span><div class="month-bar-container"></div><span class="month-value">-</span></div>`;
+                    continue;
+                }
+                const pct = (v.lbs / maxMonthLbs * 100).toFixed(1);
+                html += `<div class="month-row">
+                    <span class="month-label">${MONTH_NAMES[m]||m}</span>
+                    <div class="month-bar-container"><div class="month-bar" style="width:${pct}%"></div></div>
+                    <span class="month-value">${formatLbs(v.lbs)} lbs</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        content.innerHTML = html;
+        panel.classList.add('active');
+        panel.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    function closeDetail() {
+        document.getElementById('detailPanel').classList.remove('active');
+    }
+
+    init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "data_year": 2023,
+  "data_source": "California Department of Pesticide Regulation \u2014 Pesticide Use Reports",
+  "data_url": "https://files.cdpr.ca.gov/pub/outgoing/pur_archives/",
+  "plss_source": "California DPR PLSS Shapefiles",
+  "total_sections": 22923,
+  "total_applications": 3400051,
+  "total_lbs": 138805705.0,
+  "total_restricted_lbs": 33950170.0,
+  "unique_chemicals": 582,
+  "data_freshness": "2023 (annual release, November 2025)",
+  "build_note": "Geographic precision: ~1 square mile (PLSS section centroids)"
+}
